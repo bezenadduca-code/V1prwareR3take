@@ -1,0 +1,499 @@
+-- Chance Aimbot - Standalone
+print("Chance Aimbot loaded")
+
+local _ok, _err = pcall(function()
+
+------------------------------------------------------------------------
+-- Services
+------------------------------------------------------------------------
+local svc = {
+    Players     = game:GetService("Players"),
+    Run         = game:GetService("RunService"),
+    Input       = game:GetService("UserInputService"),
+    RS          = game:GetService("ReplicatedStorage"),
+    WS          = game:GetService("Workspace"),
+    Stats       = game:GetService("Stats"),
+    TweenService = game:GetService("TweenService"),
+}
+
+local lp = svc.Players.LocalPlayer
+local gui = lp:WaitForChild("PlayerGui", 10)
+
+------------------------------------------------------------------------
+-- WindUI
+------------------------------------------------------------------------
+local ui = loadstring(game:HttpGet(
+    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+))()
+
+------------------------------------------------------------------------
+-- Colors
+------------------------------------------------------------------------
+local Colors = {
+    Gold      = Color3.fromHex("#FFD700"),
+    Red       = Color3.fromHex("#FF0000"),
+    Green     = Color3.fromHex("#00FF00"),
+    Blue      = Color3.fromHex("#1E90FF"),
+    Purple    = Color3.fromHex("#9D4EDD"),
+    Orange    = Color3.fromHex("#FF7518"),
+    Toxic     = Color3.fromHex("#39FF14"),
+    LightBlue = Color3.fromHex("#7DD3FC"),
+    DarkBg    = Color3.fromHex("#0F172A"),
+    Pink      = Color3.fromHex("#E8194B"),
+}
+
+------------------------------------------------------------------------
+-- Gradient Text Helper
+------------------------------------------------------------------------
+local function GradientText(text, c1, c2)
+    local result = ""
+    local len = #text
+    for i = 1, len do
+        local t = (i - 1) / math.max(len - 1, 1)
+        local r = math.floor((c1.R + (c2.R - c1.R) * t) * 255)
+        local g = math.floor((c1.G + (c2.G - c1.G) * t) * 255)
+        local b = math.floor((c1.B + (c2.B - c1.B) * t) * 255)
+        result = result .. string.format('<font color="rgb(%d,%d,%d)">%s</font>', r, g, b, text:sub(i, i))
+    end
+    return result
+end
+
+------------------------------------------------------------------------
+-- Theme
+------------------------------------------------------------------------
+ui:AddTheme({
+    Name            = "ChanceTheme",
+    Accent          = Color3.fromHex("#FF69B4"),
+    Background      = Color3.fromHex("#2D0A14"),
+    Outline         = Color3.fromHex("#FF69B4"),
+    Text            = Color3.fromHex("#FFB3C6"),
+    Toggle          = Color3.fromHex("#FF69B4"),
+    ToggleBar       = Color3.fromHex("#8B0024"),
+    Checkbox        = Color3.fromHex("#FF69B4"),
+    CheckboxIcon    = Color3.fromHex("#FFB3C6"),
+    Slider          = Color3.fromHex("#FF69B4"),
+    SliderThumb     = Color3.fromHex("#FFB3C6"),
+    WindowBackground= Color3.fromHex("#1A0610"),
+})
+ui:SetTheme("ChanceTheme")
+
+------------------------------------------------------------------------
+-- Window
+------------------------------------------------------------------------
+local win = ui:CreateWindow({
+    Title          = GradientText("Chance Aimbot", Color3.fromHex("#FF69B4"), Colors.Gold),
+    Icon           = "crosshair",
+    Author         = "Chance Aimbot",
+    Folder         = "chance-aimbot",
+    Size           = UDim2.fromOffset(480, 520),
+    MinSize        = Vector2.new(400, 380),
+    MaxSize        = Vector2.new(700, 600),
+    Transparent    = true,
+    Theme          = "ChanceTheme",
+    Resizable      = true,
+    SideBarWidth   = 160,
+    HideSearchBar  = false,
+    ScrollBarEnabled = true,
+})
+
+win:SetToggleKey(Enum.KeyCode.L)
+ui:SetFont("rbxasset://fonts/families/AccanthisADFStd.json")
+
+------------------------------------------------------------------------
+-- Helpers
+------------------------------------------------------------------------
+local function getTeamFolder(name)
+    local root = svc.WS:FindFirstChild("Players")
+    return root and root:FindFirstChild(name)
+end
+
+------------------------------------------------------------------------
+-- TAB: Chance Aimbot
+------------------------------------------------------------------------
+local tabChance = win:Tab({ 
+    Title = "Chance", 
+    Icon = "crosshair", 
+    IconColor = Color3.fromHex("#FF69B4"), 
+    ShowTabTitle = false 
+})
+
+local secMain = tabChance:Section({ Title = "Chance Aimbot", Opened = true })
+
+------------------------------------------------------------------------
+-- Aimbot Variables
+------------------------------------------------------------------------
+local chanceAimEnabled  = false
+local chancePredMode    = "Velocity"
+local chancePredValue   = 0.5
+local chanceAimBehavior = "Normal"
+local chanceSpinDur     = 0.5
+local chanceMsgOnAim    = false
+local chanceMsgText     = ""
+local chanceCustomAnim  = false
+local chanceCustomAnimID= ""
+local chanceAntiBait    = true
+local chanceSmoothSpeed = 14
+local chanceHeightAim   = true
+local chanceHoldToAim   = true
+local chanceAimKey      = Enum.KeyCode.Q
+local chanceHoldingKey  = false
+local chanceAiming      = false
+local chanceStartTime   = 0
+local chanceAimDuration = 1.7
+
+local chanceHum, chanceHRP, chanceBodyGyro, chanceSavedAutoRotate
+local chanceMotion = {}
+local chancePingSamples = {}
+local _chanceLastPingTime = 0
+local _chanceLastPingVal = 0.1
+
+local killerSpeeds = {
+    Slasher = {walk = 9, run = 28},
+    c00lkidd = {walk = 7.75, run = 28},
+    JohnDoe = {walk = 9, run = 27.25},
+    ["1x1x1x1"] = {walk = 8.5, run = 27},
+    Noli = {walk = 7.5, run = 27.5},
+    Guest666 = {walk = 9, run = 27},
+    Nosferatu = {walk = 7.25, run = 27.5},
+    Doombringer = {walk = 8, run = 27},
+    JaneDoe = {walk = 9, run = 27},
+    Builderman = {walk = 8.5, run = 27.5},
+    Dusekkar = {walk = 8, run = 27.5},
+}
+
+------------------------------------------------------------------------
+-- Chance Aimbot Functions
+------------------------------------------------------------------------
+local function chanceSetChar(c)
+    chanceHum = c:WaitForChild("Humanoid")
+    chanceHRP = c:WaitForChild("HumanoidRootPart")
+end
+
+if lp.Character then chanceSetChar(lp.Character) end
+lp.CharacterAdded:Connect(chanceSetChar)
+
+local function chanceGetMotion(hrp)
+    local now = tick()
+    local pos = hrp.Position
+    local data = chanceMotion[hrp]
+    if not data then
+        chanceMotion[hrp] = {lastPos = pos, lastTime = now, velocity = Vector3.zero, accel = Vector3.zero}
+        return Vector3.zero, Vector3.zero
+    end
+    local dt = now - data.lastTime
+    if dt <= 0 then return data.velocity, data.accel end
+    local vel = (pos - data.lastPos) / dt
+    local acc = (vel - data.velocity) / dt
+    data.lastPos = pos
+    data.lastTime = now
+    data.accel = acc
+    data.velocity = vel
+    return vel, acc
+end
+
+local function chanceGetPing()
+    local now = tick()
+    if now - _chanceLastPingTime < 1 then return _chanceLastPingVal end
+    _chanceLastPingTime = now
+    local ok, stat = pcall(function()
+        return svc.Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    local raw = (ok and stat or 100) / 1000
+    table.insert(chancePingSamples, raw)
+    if #chancePingSamples > 5 then table.remove(chancePingSamples, 1) end
+    local s = 0
+    for _, v in ipairs(chancePingSamples) do s = s + v end
+    _chanceLastPingVal = s / #chancePingSamples
+    return _chanceLastPingVal
+end
+
+local function chanceGetNearest()
+    if not chanceHRP then return nil end
+    local folder = getTeamFolder("Killers")
+    if not folder then return nil end
+    local closest, dist = nil, math.huge
+    for _, m in ipairs(folder:GetChildren()) do
+        local r = m:FindFirstChild("HumanoidRootPart")
+        local h = m:FindFirstChildOfClass("Humanoid")
+        if r and h and h.Health > 0 then
+            local d = (r.Position - chanceHRP.Position).Magnitude
+            if d < dist then
+                dist = d
+                closest = r
+            end
+        end
+    end
+    return closest
+end
+
+local function chancePredict(hrp)
+    local vel, accel = chanceGetMotion(hrp)
+    local pos = hrp.Position
+    local speed = vel.Magnitude
+
+    if chanceAntiBait then
+        local model = hrp.Parent
+        if model and killerSpeeds[model.Name] then
+            local maxSpd = killerSpeeds[model.Name].run + 2
+            if speed > maxSpd then
+                vel = vel.Unit * maxSpd
+                speed = maxSpd
+            end
+        end
+    end
+
+    local ping = chanceGetPing()
+    local dist = chanceHRP and (hrp.Position - chanceHRP.Position).Magnitude or 0
+    local ds = dist * 0.003
+    local lead
+
+    if chancePredMode == "Velocity" then
+        lead = chancePredValue + ds
+    elseif chancePredMode == "Ping" then
+        lead = ping * chancePredValue + ds
+    elseif chancePredMode == "Look" then
+        return pos + hrp.CFrame.LookVector * (speed * chancePredValue)
+    elseif chancePredMode == "LookPing" then
+        return pos + hrp.CFrame.LookVector * (speed * ping)
+    else
+        lead = chancePredValue
+    end
+
+    if speed < 0.5 then return pos end
+    local ac = accel * lead * lead * 0.5
+    if ac.Magnitude > speed * 0.4 then
+        ac = ac.Unit * (speed * 0.4)
+    end
+    return pos + vel * lead + ac
+end
+
+local function chanceHookAnimator(char)
+    local hum = char:WaitForChild("Humanoid")
+    local anim = hum:WaitForChild("Animator")
+    local triggers = {
+        ["133607163653602"] = true,
+        ["133491532453922"] = true,
+        ["131189930305001"] = true,
+        ["111384272984267"] = true,
+        ["103601716322988"] = true,
+        ["76649505662612"] = true,
+    }
+    anim.AnimationPlayed:Connect(function(track)
+        if not chanceAimEnabled or chanceHoldToAim then return end
+        local id = track.Animation.AnimationId:match("%d+")
+        if id and triggers[id] then
+            if chanceHum then
+                chanceSavedAutoRotate = chanceHum.AutoRotate
+                chanceHum.AutoRotate = false
+            end
+            chanceAiming = true
+            chanceStartTime = tick()
+            track.Ended:Connect(function()
+                if chanceHum and chanceSavedAutoRotate ~= nil then
+                    chanceHum.AutoRotate = chanceSavedAutoRotate
+                end
+                if chanceBodyGyro and chanceBodyGyro.Parent then
+                    chanceBodyGyro:Destroy()
+                    chanceBodyGyro = nil
+                end
+                chanceAiming = false
+            end)
+        end
+    end)
+end
+
+if lp.Character then chanceHookAnimator(lp.Character) end
+lp.CharacterAdded:Connect(chanceHookAnimator)
+
+svc.Input.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if chanceHoldToAim and input.KeyCode == chanceAimKey then
+        chanceHoldingKey = true
+        chanceAiming = true
+        chanceStartTime = tick()
+    end
+end)
+
+svc.Input.InputEnded:Connect(function(input)
+    if chanceHoldToAim and input.KeyCode == chanceAimKey then
+        chanceHoldingKey = false
+        chanceAiming = false
+    end
+end)
+
+-- Main aimbot loop
+svc.Run.RenderStepped:Connect(function()
+    if not chanceAimEnabled or not chanceHRP then return end
+
+    if chanceHoldToAim then
+        if not chanceHoldingKey then return end
+    else
+        if not chanceAiming then return end
+        if tick() - chanceStartTime > chanceAimDuration then
+            chanceAiming = false
+            return
+        end
+    end
+
+    local target = chanceGetNearest()
+    if not target then return end
+
+    local pos = chancePredict(target)
+    if not pos then return end
+
+    local aimPos = chanceHeightAim and pos or Vector3.new(pos.X, chanceHRP.Position.Y, pos.Z)
+
+    if chanceAimBehavior == "360" then
+        local prog = (tick() - chanceStartTime) / chanceSpinDur
+        if prog < 1 then
+            chanceHRP.CFrame = CFrame.new(chanceHRP.Position) * CFrame.Angles(0, math.rad(360 * prog), 0)
+            return
+        end
+    end
+
+    if not chanceBodyGyro or not chanceBodyGyro.Parent then
+        chanceBodyGyro = Instance.new("BodyGyro")
+        chanceBodyGyro.MaxTorque = Vector3.new(0, math.huge, 0)
+        chanceBodyGyro.P = 10000
+        chanceBodyGyro.D = 500
+        chanceBodyGyro.Parent = chanceHRP
+    end
+
+    chanceBodyGyro.CFrame = CFrame.lookAt(chanceHRP.Position, aimPos)
+end)
+
+------------------------------------------------------------------------
+-- UI Elements
+------------------------------------------------------------------------
+secMain:Toggle({
+    Title = "Enable Aimbot",
+    Type = "Checkbox",
+    Flag = "chanceAimOn",
+    Default = false,
+    Callback = function(v) chanceAimEnabled = v end
+})
+
+secMain:Dropdown({
+    Title = "Prediction Mode",
+    Flag = "chancePredMode",
+    Values = {"Velocity", "Ping", "Look", "LookPing"},
+    Default = "Velocity",
+    Callback = function(v) chancePredMode = v end
+})
+
+secMain:Slider({
+    Title = "Prediction Value",
+    Flag = "chancePredVal",
+    Step = 0.05,
+    Value = {Min = 0.1, Max = 2.0, Default = 0.5},
+    Callback = function(v) chancePredValue = v end
+})
+
+secMain:Slider({
+    Title = "Smooth Speed",
+    Flag = "chanceSmoothSpd",
+    Step = 1,
+    Value = {Min = 1, Max = 30, Default = 14},
+    Callback = function(v) chanceSmoothSpeed = v end
+})
+
+secMain:Toggle({
+    Title = "Height-Aware Aim",
+    Type = "Checkbox",
+    Flag = "chanceHeightAim",
+    Default = true,
+    Callback = function(v) chanceHeightAim = v end
+})
+
+secMain:Dropdown({
+    Title = "Aim Behavior",
+    Flag = "chanceAimBehav",
+    Values = {"Normal", "360"},
+    Default = "Normal",
+    Callback = function(v) chanceAimBehavior = v end
+})
+
+secMain:Slider({
+    Title = "Spin Duration (s)",
+    Flag = "chanceSpinDur",
+    Step = 0.05,
+    Value = {Min = 0.1, Max = 2.0, Default = 0.5},
+    Callback = function(v) chanceSpinDur = v end
+})
+
+secMain:Toggle({
+    Title = "Anti Bait",
+    Type = "Checkbox",
+    Flag = "chanceAntiBait",
+    Default = true,
+    Callback = function(v) chanceAntiBait = v end
+})
+
+secMain:Toggle({
+    Title = "Hold-to-Aim",
+    Type = "Checkbox",
+    Flag = "chanceHoldAim",
+    Default = true,
+    Callback = function(v) chanceHoldToAim = v end
+})
+
+secMain:Dropdown({
+    Title = "Aim Key",
+    Flag = "chanceAimKey",
+    Values = {"Q", "E", "R", "T", "F", "G", "X", "C", "V"},
+    Default = "Q",
+    Callback = function(v) chanceAimKey = Enum.KeyCode[v] end
+})
+
+secMain:Toggle({
+    Title = "Message When Aim",
+    Type = "Checkbox",
+    Flag = "chanceMsgOnAim",
+    Default = false,
+    Callback = function(v) chanceMsgOnAim = v end
+})
+
+secMain:Input({
+    Title = "Message Text",
+    Flag = "chanceMsgText",
+    Placeholder = "Type message...",
+    Callback = function(v) chanceMsgText = v end
+})
+
+------------------------------------------------------------------------
+-- Info Section
+------------------------------------------------------------------------
+local secInfo = tabChance:Section({ Title = "Info", Opened = true })
+
+secInfo:Paragraph({
+    Title = "How it works",
+    Content = [[
+• Aims at the nearest killer
+• Predicts movement based on selected mode
+• Hold Q (or selected key) to aim
+• Supports 360 spin behavior
+• Anti-bait prevents speed abuse
+    ]]
+})
+
+------------------------------------------------------------------------
+-- Keybinds Display
+------------------------------------------------------------------------
+local secKeybinds = tabChance:Section({ Title = "Keybinds", Opened = true })
+
+secKeybinds:Paragraph({
+    Title = "Controls",
+    Content = "Hold " .. tostring(chanceAimKey):gsub("Enum.KeyCode.", "") .. " to aim at the nearest killer"
+})
+
+------------------------------------------------------------------------
+-- Start
+------------------------------------------------------------------------
+print("Chance Aimbot ready!")
+
+end)
+
+if not _ok then
+    warn("[Chance Aimbot Error]", tostring(_err))
+    print("[Chance Aimbot Error]", tostring(_err))
+end
