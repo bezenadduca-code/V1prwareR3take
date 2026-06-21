@@ -2213,7 +2213,7 @@ local tabChar = win:Tab({ Title = "Character", Icon = "user" })
 local secSentinels = tabChar:Section({ Title = "Sentinels", Opened = true })
 
 secSentinels:Button({ Title="Guest1337", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/r3take/Forsakan/refs/heads/main/Guest"))() end) end })
-secSentinels:Button({ Title="Chance", Callback=function() pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/XnXQY5VD"))() end) end })
+secSentinels:Button({ Title="Chance", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/bezenadduca-code/V1prwareR3take/refs/heads/main/Chance"))() end) end })
 secSentinels:Button({ Title="TwoTime", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/r3take/Forsakan/refs/heads/main/viperstab"))() end) end })
 secSentinels:Button({ Title="Jane Doe", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/bezenadduca-code/Ok/refs/heads/main/Jane%20doe"))() end) end })
 
